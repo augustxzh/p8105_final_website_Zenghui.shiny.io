@@ -181,9 +181,9 @@ Shooters in school
 ===================================== 
 **Most shooters in school are, unfortunately, students.**
 
-To investigate the causes for mass shooting in school, I first identified the shooter's position in school--whether it is a student, a faculty/staff, or with other positions. I made a pie chart to show the percentage of each position, and found that more than 75% of the shooters in school are students (with a "place of schooling" label). Thus, "student shooter" becomes a major consideration in the analysis for causes of mass shooring in school.
+To investigate the causes for mass shooting in school, I first identified the shooter's position in school--whether it is a student, a faculty/staff, or with other positions. I made a pie chart to show the percentage of each position, and found that more than 75% of the shooters in school are students (with a "place of schooling" label). Thus, "student shooter" becomes a major consideration in the analysis for causes of mass shooting in school.
 
-Comparing to the motives in general population, "student" shooter have a unique motive characteristics. The proportions of the following motives are extremely higher in "student shooter" than in general population: Failure, Harrasment, Social dispute, Expulsion/suspension, and Mental illness.
+Comparing to the motives in general population, "student shooters" have unique motives. The proportions of the following motives are extremely higher in "student shooter" than in general population: Failure, Harrasment, Social dispute, Expulsion/suspension, and Mental illness.
 
 
 Row
