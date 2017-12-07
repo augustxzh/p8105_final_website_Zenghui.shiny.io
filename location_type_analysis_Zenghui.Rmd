@@ -1,0 +1,224 @@
+---
+title: "Mass shooting in school"
+output: 
+  flexdashboard::flex_dashboard:
+    orientation: rows
+    vertical_layout: scroll
+runtime: shiny
+---
+
+```{r setup and data wranggling run this part before any chunk from Zenghui}
+knitr::opts_chunk$set(echo = FALSE, message = FALSE, warning = FALSE, fig.align = "center")
+
+library(tidyverse)
+library(ggjoy)
+library(janitor)
+library(plotly)
+library(dplyr)
+library(viridis)
+library(RColorBrewer)
+library(stringr)
+library(forcats)
+library(ggjoy)
+library(knitr)
+library(shiny)
+library(flexdashboard)
+
+#dataset cleaning regarding place_type and school_related
+data_shooting_x = read_csv("./data/Stanford_MSA_Database_for_release_06142016_v2.csv") %>%
+  mutate(place_type_fixed = place_type)
+
+#fix the inconsistency of value format for "place_type". The fixed variable is called place_type_fixed
+data_shooting_x$place_type_fixed[grep("Entertainment Venue", data_shooting_x$place_type_fixed)] = "Entertainment venue"
+data_shooting_x$place_type_fixed[grep("Park/Wilderness", data_shooting_x$place_type_fixed)] = "Park/Wildness"
+data_shooting_x$place_type_fixed[grep("Residential Home/Neighborhood", data_shooting_x$place_type_fixed)] = "Residential home/Neighborhood"
+data_shooting_x$place_type_fixed[grep("Restaurant", data_shooting_x$place_type_fixed)] = "Restaurant/Cafe"
+data_shooting_x$place_type_fixed[grep("Secondary School", data_shooting_x$place_type_fixed)] = "Secondary school"
+data_shooting_x$place_type_fixed[grep("Retail/ Wholesale/Services facility\r\nand Primary school", data_shooting_x$place_type_fixed)] = "Retail/Wholesale/Services facility\r\nand Primary school"
+data_shooting_x$place_type_fixed[grep("Retail/ Wholesale/Services facility", data_shooting_x$place_type_fixed)] = "Retail/Wholesale/Services facility"
+
+data_shooting_x = data_shooting_x %>%
+  mutate(school_related_fixed = ifelse((grepl("chool", place_type_fixed) + grepl("ollege", place_type_fixed)) == 1, "Yes", "No")) %>%    #decide if the place is school based on the text in place_type. I will not use "school related", since it has too many mistakes in its values.
+  mutate(victim_fatality_rate = number_of_victim_fatalities / total_number_of_victims) %>% #new variable victim fatality rate: it indicate how fatal the incident is
+  mutate(place_type_school = ifelse(school_related_fixed == "Yes", "School", place_type_fixed))
+
+data_school_related = data_shooting_x %>%
+  select(year, place_type_fixed, school_related_fixed, number_of_victim_fatalities, total_number_of_victims, victim_fatality_rate) %>%
+  mutate(place_type_school = ifelse(school_related_fixed == "Yes", "School", place_type_fixed)) 
+```
+
+School--a hot spot of mass shooting
+===================================== 
+
+
+Row {.tabset .tabset-fade} 
+---------------------------------------------------------------------
+
+**School is not a safe place, in terms of mass shooting.**
+
+We want to ask if school is a relatively safer place. By comparing the total number of cases and the total number of victims among 15 different types of place, we notice that "school" ranks number 1 in the total number of cases, and number 2 in the total number of victims. Thus, school is actually a hot spot of mass shooting.
+
+### Mass shooting incdicence number by place type.
+
+```{r zenghui n_cases vs place_type, fig.height=7, fig.width=8}
+# make a list showing whether a place_type_school is school_related
+place_type_school_w_school = data_school_related %>%
+  select(place_type_school, school_related_fixed) %>%
+  distinct()
+
+#make a list to count the number of incident in each place_type_school
+n_incident_place_type_school = data_school_related %>%
+  count(place_type_school, sort = TRUE) %>% 
+  mutate(place_type_school = fct_reorder(place_type_school, n))
+
+#make a dataframe to count the number of incident in each place_type_school
+n_incident_place_type_school = merge(n_incident_place_type_school, place_type_school_w_school)
+#####################
+#plot the distribution of incidents based on place_type
+(n_incident_place_type_school %>%
+  #filter(place_type_school == input$place_type_shiny, year %in% input$year_range[1]:input$year_range[2]) %>%
+  ggplot(aes(x = place_type_school, y = n, fill = school_related_fixed)) + 
+    geom_bar(stat = "identity") + 
+    coord_flip() +
+    scale_fill_discrete(name = "School") +
+    ylab("Total number of mass shooting incidence (1966-2016)") +
+    xlab("Place type") +
+    theme_bw())
+```
+
+### Mass shooting victim number by place type.
+
+```{r zenghui n_total_victim vs place_type, fig.height=7, fig.width=8}
+data_school_related = data_shooting_x %>%
+  select(year, place_type_fixed, school_related_fixed, number_of_victim_fatalities, total_number_of_victims, victim_fatality_rate) %>%
+  mutate(place_type_school = ifelse(school_related_fixed == "Yes", "School", place_type_fixed))
+# 1. total victim number
+data_school_related %>%
+  group_by(place_type_school) %>%
+  summarise(total_victim_number = sum(total_number_of_victims), n_vitime_per_case = mean(total_number_of_victims), school_related_fixed = school_related_fixed[1]) %>% 
+  mutate(place_type_school = fct_reorder(place_type_school, total_victim_number)) %>%
+  ggplot(aes(x = place_type_school, y = total_victim_number, fill = school_related_fixed)) + 
+    geom_bar(stat = "identity") + 
+    coord_flip() +
+    scale_fill_discrete(name = "School") +
+    ylab("Total number of victims in mass shooting incidences (1966-2016)") +
+    xlab("Place type") +
+    theme_bw()
+```
+
+A bloody history--mass shooting
+===================================== 
+
+Column {.sidebar}
+----------------------------------------------------------------------
+```{r set sidebar}
+# sliderInput widget
+year_range = data_shooting_x %>% distinct(year) %>% pull() %>% sort() %>% range()
+
+sliderInput("year_range", label = h3("Choose year range"), min = min(year_range), max = max(year_range), value = c(1966, 2016), step = 1, sep = "")
+
+# #checkboxInput widget
+# type_of_place = data_shooting_x %>%
+#   select(place_type_school) %>%
+#   distinct(place_type_school) %>%
+#   pull() %>%
+#   sort()
+# 
+# checkboxGroupInput("place_type_shiny", label = h3("Select place type"), 
+#     choices = type_of_place,
+#     selected = type_of_place)
+
+```
+
+
+Row {.tabset .tabset-fade} 
+---------------------------------------------------------------------
+**Mass shooting has a longer history in school than in other types of place.**
+
+We next plotted the number of cases and the number of victims in each type of place over the years from 1966 to 2016. We can see that, in most place types, mass shootings started to occur after the 1980's and 1990's. However, unlike other place types, mass shooting in school can be traced back to as early as 1966. The occurrence in school is also more evenly distribured all over the years from 1966 to 2016. This phenomena may suggest that the causes of mass shooting in school are persistent.
+
+### Changes in number of victims over year.
+
+```{r zenghui total_number_of_victims_per_year vs time, fig.height=8, fig.width=8}
+#2. point place_type
+renderPlotly(ggplotly(width = 1000, height = 600, p =
+data_school_related %>%
+  filter(year %in% input$year_range[1]:input$year_range[2]) %>%
+  group_by(year, place_type_school) %>%
+  summarise(total_number_of_victims_per_year = sum(total_number_of_victims)) %>%
+    group_by(place_type_school) %>%
+    mutate(total_number_of_victims_all_years = sum(total_number_of_victims_per_year)) %>%
+    ungroup() %>%
+  mutate(place_type_school = fct_reorder(place_type_school, total_number_of_victims_all_years)) %>%
+  ggplot(aes(x = year, y = place_type_school, size = total_number_of_victims_per_year, color = total_number_of_victims_all_years)) +
+    geom_point() +
+    scale_color_gradient(low = "#fc9272", high = "#67000d") +
+    theme_bw()) %>%
+    layout(xaxis = list(title = "year"), yaxis = list(title = "Place Type")))
+```
+
+### Changes in number of mass shooting cases over year.
+
+```{r zenghui total_number_of_cases_per_year vs time}
+renderPlotly(ggplotly(width = 1000, height = 600, p =
+data_school_related %>%
+  filter(year %in% input$year_range[1]:input$year_range[2]) %>%
+  group_by(year, place_type_school) %>%
+  summarise(number_of_cases_per_year = n()) %>%
+    group_by(place_type_school) %>%
+    mutate(total_number_of_cases_all_years = sum(number_of_cases_per_year)) %>%
+    ungroup() %>%
+  mutate(place_type_school = fct_reorder(place_type_school, total_number_of_cases_all_years)) %>%
+  ggplot(aes(x = year, y = place_type_school, size = number_of_cases_per_year, color = total_number_of_cases_all_years)) +
+    geom_point() +
+    scale_color_gradient(low = "#fc9272", high = "#67000d") +
+    theme_bw()) %>%
+    layout(xaxis = list(title = "year"), yaxis = list(title = "Place Type")))
+```
+
+
+Shooters in school
+===================================== 
+**Most shooters in school are, unfortunately, students.**
+
+To investigate the causes for mass shooting in school, I first identified the shooter's position in school--whether it is a student, a faculty/staff, or with other positions. I made a pie chart to show the percentage of each position, and found that more than 75% of the shooters in school are students (with a "place of schooling" label). Thus, "student shooter" becomes a major consideration in the analysis for causes of mass shooring in school.
+
+Comparing to the motives in general population, "student" shooter have a unique motive characteristics. The proportions of the following motives are extremely higher in "student shooter" than in general population: Failure, Harrasment, Social dispute, Expulsion/suspension, and Mental illness.
+
+
+Row
+---------------------------------------------------------------------
+
+### Shooter's position in that school
+
+```{r zenghui shooter identity in school shooting}
+renderPlotly(data_shooting_x %>%
+  filter(year %in% input$year_range[1]:input$year_range[2]) %>%
+  mutate(place_type_school = ifelse(school_related_fixed == "Yes", "School", place_type_fixed)) %>%
+  filter(place_type_school == "School") %>%
+  group_by(relationship_to_incident_location) %>%
+  mutate(n_occupation = n()) %>% 
+  ungroup() %>%
+plot_ly(labels = ~relationship_to_incident_location, values = ~n_occupation, type = 'pie', textposition = 'inside', textinfo = 'label+percent') %>%
+  layout(title = "Shooter's position in that school",
+         xaxis = list(showgrid = FALSE, zeroline = FALSE, showticklabels = FALSE),
+         yaxis = list(showgrid = FALSE, zeroline = FALSE, showticklabels = FALSE))
+)
+```
+
+### Why these students shoot?
+
+```{r zenghui student shooter motive in school shooting}
+renderPlotly(data_shooting_x %>%
+  filter(year %in% input$year_range[1]:input$year_range[2]) %>%
+  mutate(place_type_school = ifelse(school_related_fixed == "Yes", "School", place_type_fixed)) %>%
+  filter(place_type_school == "School", relationship_to_incident_location == "Place of schooling") %>%
+  group_by(possible_motive_general) %>%
+  mutate(n_motive = n()) %>% 
+  ungroup() %>% 
+plot_ly(labels = ~possible_motive_general, values = ~n_motive, type = 'pie', textposition = 'inside', textinfo = 'label+percent') %>%
+  layout(title = "Motives of the shooters who are also students",
+         xaxis = list(showgrid = FALSE, zeroline = FALSE, showticklabels = FALSE),
+         yaxis = list(showgrid = FALSE, zeroline = FALSE, showticklabels = FALSE))
+)
+```
